@@ -1,0 +1,40 @@
+# GitLab CI/CD pipeline for the country-tally-service (Node.js 20, Express).
+# Docs: https://docs.gitlab.com/ee/ci/yaml/
+
+stages:
+  - test
+  - build
+
+# Default image for jobs that don't override it.
+default:
+  image: node:20-alpine
+
+# Cache npm's download cache across pipelines, keyed by the lockfile.
+cache:
+  key:
+    files:
+      - package-lock.json
+  paths:
+    - .npm/
+
+test:
+  stage: test
+  script:
+    # npm ci installs exactly what's in package-lock.json (reproducible builds).
+    - npm ci --cache .npm --prefer-offline
+    - npm test
+
+# Builds the Docker image and pushes it to GitLab's built-in Container Registry.
+# Runs only on the default branch, and only if `test` passed.
+build-image:
+  stage: build
+  image: docker:27
+  services:
+    - docker:27-dind
+  rules:
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
+  script:
+    - echo "$CI_REGISTRY_PASSWORD" | docker login -u "$CI_REGISTRY_USER" --password-stdin "$CI_REGISTRY"
+    - docker build -t "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA" -t "$CI_REGISTRY_IMAGE:latest" .
+    - docker push "$CI_REGISTRY_IMAGE:$CI_COMMIT_SHORT_SHA"
+    - docker push "$CI_REGISTRY_IMAGE:latest"
