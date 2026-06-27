@@ -1,93 +1,121 @@
-# country-tally-service
+# QUBCloud-FraudGuard — Country-Tally Service (Node.js / Express)
 
+This is one of the two backend services in the QUBCloud-FraudGuard app. Its one
+job is simple: **count how many transactions came from each country.**
 
+It is **stateless** — it saves nothing to a database or disk. Give it the same
+input and it always returns the same answer.
 
-## Getting started
+> The app is made of three separate repositories. The web page calls **both
+> backend services directly** — there is no "middle man" in between:
+>
+> ```
+>                       ┌──▶ screening-service  (decides OK / SUSPICIOUS)
+>   frontend (web page) ┤
+>                       └──▶ country-tally-service  (THIS repo — counts by country)
+> ```
+>
+> This service runs and tests **completely on its own** — it does not depend on
+> the other two.
 
-To make it easy for you to get started with GitLab, here's a list of recommended next steps.
+---
 
-Already a pro? Just edit this README.md and make it your own. Want to make it easy? [Use the template at the bottom](#editing-this-readme)!
+## What it does
 
-## Add your files
+You send it transactions written as `amount-card-country` (e.g. `5000-1234-UK`),
+separated by commas. It looks only at the **country** (the last part) and counts
+how many transactions came from each one.
 
-* [Create](https://docs.gitlab.com/user/project/repository/web_editor/#create-a-file) or [upload](https://docs.gitlab.com/user/project/repository/web_editor/#upload-a-file) files
-* [Add files using the command line](https://docs.gitlab.com/topics/git/add_files/#add-files-to-a-git-repository) or push an existing Git repository with the following command:
+If a transaction is written wrongly (missing parts, or no country), it is
+counted under **`UNKNOWN`** instead of crashing the service.
+
+---
+
+## The endpoints (web addresses it answers)
+
+### `GET /tally?items=<comma-separated transactions>`
+
+The root path `/` is an alias for `/tally`, so `GET /?items=...` returns the
+same result.
 
 ```
-cd existing_repo
-git remote add origin https://repository.qubcloud.uk/esha/country-tally-service.git
-git branch -M main
-git push -uf origin main
+GET /tally?items=5000-1234-UK,50000-9999-UK,200-4321-US,800-0000-CN
 ```
 
-## Integrate with your tools
+Returns JSON — a count for each country, plus the total number of transactions:
 
-* [Set up project integrations](https://repository.qubcloud.uk/esha/country-tally-service/-/settings/integrations)
+```json
+{
+  "counts": { "UK": 2, "US": 1, "CN": 1 },
+  "total_checked": 4
+}
+```
 
-## Collaborate with your team
+### `GET /health`
 
-* [Invite team members and collaborators](https://docs.gitlab.com/user/project/members/)
-* [Create a new merge request](https://docs.gitlab.com/user/project/merge_requests/creating_merge_requests/)
-* [Automatically close issues from merge requests](https://docs.gitlab.com/user/project/issues/managing_issues/#closing-issues-automatically)
-* [Enable merge request approvals](https://docs.gitlab.com/user/project/merge_requests/approvals/)
-* [Set auto-merge](https://docs.gitlab.com/user/project/merge_requests/auto_merge/)
+Returns `{"status": "ok"}` — a simple "am I alive?" check.
 
-## Test and Deploy
+---
 
-Use the built-in continuous integration in GitLab.
+## Settings (environment variables)
 
-* [Get started with GitLab CI/CD](https://docs.gitlab.com/ci/quick_start/)
-* [Analyze your code for known vulnerabilities with Static Application Security Testing (SAST)](https://docs.gitlab.com/user/application_security/sast/)
-* [Deploy to Kubernetes, Amazon EC2, or Amazon ECS using Auto Deploy](https://docs.gitlab.com/topics/autodevops/requirements/)
-* [Use pull-based deployments for improved Kubernetes management](https://docs.gitlab.com/user/clusters/agent/)
-* [Set up protected environments](https://docs.gitlab.com/ci/environments/protected_environments/)
+Read when the service starts, so nothing is hard-coded:
 
-***
+| Setting | Default | What it does                       |
+|---------|---------|------------------------------------|
+| `PORT`  | `8071`  | The port the service listens on.   |
 
-# Editing this README
+(Port `8071` is used so it does not clash with the screening service on `8070`.)
 
-When you're ready to make this README your own, just edit this file and use the handy template below (or feel free to structure it however you want - this is just a starting point!). Thanks to [makeareadme.com](https://www.makeareadme.com/) for this template.
+---
 
-## Suggestions for a good README
+## How to build and run it (Docker)
 
-Every project is different, so consider which of these sections apply to yours. The sections used in the template are suggestions for most open source projects. Also keep in mind that while a README can be too long and detailed, too long is better than too short. If you think your README is too long, consider utilizing another form of documentation rather than cutting out information.
+From inside this repository:
 
-## Name
-Choose a self-explaining name for your project.
+```bash
+# 1. Build the image
+docker build -t country-tally-service .
 
-## Description
-Let people know what your project can do specifically. Provide context and add a link to any reference visitors might be unfamiliar with. A list of Features or a Background subsection can also be added here. If there are alternatives to your project, this is a good place to list differentiating factors.
+# 2. Run it (on port 8071)
+docker run -d --name country-tally-service -p 8071:8071 country-tally-service
 
-## Badges
-On some READMEs, you may see small images that convey metadata, such as whether or not all the tests are passing for the project. You can use Shields to add some to your README. Many services also have instructions for adding a badge.
+# 3. Try it
+curl "http://localhost:8071/health"
+curl "http://localhost:8071/tally?items=5000-1234-UK,50000-9999-UK,200-4321-US,800-0000-CN"
+```
 
-## Visuals
-Depending on what you are making, it can be a good idea to include screenshots or even a video (you'll frequently see GIFs rather than actual videos). Tools like ttygif can help, but check out Asciinema for a more sophisticated method.
+Stop and remove it when done:
 
-## Installation
-Within a particular ecosystem, there may be a common way of installing things, such as using Yarn, NuGet, or Homebrew. However, consider the possibility that whoever is reading your README is a novice and would like more guidance. Listing specific steps helps remove ambiguity and gets people to using your project as quickly as possible. If it only runs in a specific context like a particular programming language version or operating system or has dependencies that have to be installed manually, also add a Requirements subsection.
+```bash
+docker rm -f country-tally-service
+```
 
-## Usage
-Use examples liberally, and show the expected output if you can. It's helpful to have inline the smallest example of usage that you can demonstrate, while providing links to more sophisticated examples if they are too long to reasonably include in the README.
+---
 
-## Support
-Tell people where they can go to for help. It can be any combination of an issue tracker, a chat room, an email address, etc.
+## The code (what each file is)
 
-## Roadmap
-If you have ideas for releases in the future, it is a good idea to list them in the README.
+| File              | What it does                                            |
+|-------------------|---------------------------------------------------------|
+| `tally.js`        | The counting logic — the important part.                |
+| `app.js`          | Wraps the logic in a small web service (the endpoints). |
+| `test_tally.js`   | Automated tests for the counting logic.                 |
+| `package.json`    | Declares the one dependency (Express) and the scripts.  |
+| `Dockerfile`      | How to build the container image.                       |
 
-## Contributing
-State if you are open to contributions and what your requirements are for accepting them.
+Every file has plain-English comments — open them and read along.
 
-For people who want to make changes to your project, it's helpful to have some documentation on how to get started. Perhaps there is a script that they should run or some environment variables that they need to set. Make these steps explicit. These instructions could also be useful to your future self.
+---
 
-You can also document commands to lint the code or run tests. These steps help to ensure high code quality and reduce the likelihood that the changes inadvertently break something. Having instructions for running tests is especially helpful if it requires external setup, such as starting a Selenium server for testing in a browser.
+## Running the tests
 
-## Authors and acknowledgment
-Show your appreciation to those who have contributed to the project.
+```bash
+# Inside the Node image, without installing anything on your computer:
+docker run --rm -v "$PWD":/app -w /app node:20-alpine \
+  sh -c "npm install --silent && npm test"
+```
 
-## License
-For open source projects, say how it is licensed.
+(If you have Node installed locally, `npm install && npm test` also works.)
 
-## Project status
-If you have run out of energy or time for your project, put a note at the top of the README saying that development has slowed down or stopped completely. Someone may choose to fork your project or volunteer to step in as a maintainer or owner, allowing your project to keep going. You can also make an explicit request for maintainers.
+The tests cover: a normal batch, empty input, a malformed transaction (the
+`UNKNOWN` bucket), and that the per-country counts add up to the total.

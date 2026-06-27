@@ -1,0 +1,13 @@
+{
+  "name": "country-tally-service",
+  "version": "1.0.0",
+  "description": "Counts QUBCloud-FraudGuard transactions by country (Node.js/Express).",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "test": "node --test test_tally.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
