@@ -31,6 +31,8 @@ build-image:
   image: docker:27
   services:
     - docker:27-dind
+  tags:
+    - dockerindocker
   rules:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
   script:
